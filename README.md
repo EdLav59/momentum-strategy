@@ -1,5 +1,5 @@
 # momentum-trading-strategy
-Implementation of Jegadeesh &amp; Titman (1993) momentum trading strategy
+Implementation of Jegadeesh &amp; Titman (1993) Momentum Trading Strategy
 # Momentum Trading Strategy
 
 Python implementation of the Jegadeesh & Titman (1993) momentum trading strategy.

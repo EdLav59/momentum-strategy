@@ -43,7 +43,7 @@ This approach protects capital during turbulent periods while maintaining exposu
 
 | Metric | V1 (Original) | V2 (Regime-Aware) | Improvement |
 |--------|---------------|-------------------|-------------|
-| **Sharpe Ratio** | **-0.23** | **+0.35** | **+252%** ⭐ |
+| **Sharpe Ratio** | **-0.23** | **+0.35** | **+252%**  |
 | Annual Return | +0.16% | +0.12% | -4 bps |
 | Max Drawdown | -0.96% | -1.04% | Similar |
 | 2024 Return | **-0.2%** | **+1.0%** | **+120 bps** |

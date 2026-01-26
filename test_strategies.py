@@ -4,8 +4,8 @@ This uses a small subset of data for quick verification
 """
 
 import sys
-sys.path.insert(0, '/home/claude/momentum-trading-strategy/v1_original')
-sys.path.insert(0, '/home/claude/momentum-trading-strategy/v2_regime_aware')
+sys.path.insert(0, 'v1_original')
+sys.path.insert(0, 'v2_regime_aware')
 
 print("=" * 70)
 print("TESTING MOMENTUM STRATEGY IMPLEMENTATIONS")

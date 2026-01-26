@@ -94,7 +94,6 @@ class MomentumStrategyV1:
             'BMW.DE',     # BMW
             'CON.DE',     # Continental
             'MBG.DE',     # Daimler (Mercedes-Benz)
-            '1COV.DE',    # Covestro
             'DB1.DE',     # Deutsche Boerse
             'DBK.DE',     # Deutsche Bank
             'DHL.DE',     # Deutsche Post

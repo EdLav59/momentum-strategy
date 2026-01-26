@@ -93,8 +93,8 @@ class MomentumStrategyV1:
             'BAYN.DE',    # Bayer
             'BMW.DE',     # BMW
             'CON.DE',     # Continental
-            'DAI.DE',     # Daimler (Mercedes-Benz)
-            '1COV.VI',    # Covestro
+            'MBG.DE',     # Daimler (Mercedes-Benz)
+            '1COV.DE',    # Covestro
             'DB1.DE',     # Deutsche Boerse
             'DBK.DE',     # Deutsche Bank
             'DHL.DE',     # Deutsche Post
@@ -116,10 +116,10 @@ class MomentumStrategyV1:
         ]
         
         # Strategy parameters
-        self.formation_months = 6
-        self.holding_months = 3
-        self.top_percentile = 10
-        self.bottom_percentile = 10
+        self.formation_months = 12
+        self.holding_months = 6
+        self.top_percentile = 20
+        self.bottom_percentile = 20
         
         # Data storage
         self.price_data = None

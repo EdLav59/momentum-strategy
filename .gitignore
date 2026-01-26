@@ -9,13 +9,9 @@ venv/
 ENV/
 .venv
 
-# Data files
-*.csv
-*.xlsx
-
-# Output files
-*.png
-*.jpg
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
 
 # IDE
 .vscode/
@@ -27,7 +23,12 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb
+# Keep results directories but ignore their contents (except .gitkeep)
+v1_original/results_v1/*
+!v1_original/results_v1/.gitkeep
+v2_regime_aware/results_v2/*
+!v2_regime_aware/results_v2/.gitkeep
 
+# Cached data
+data/*
+!data/.gitkeep

@@ -1,12 +1,12 @@
 # Version 1: Original Momentum Strategy
 
-Classic implementation of Jegadeesh & Titman (1993) momentum strategy with constant position sizing.
+Classic implementation of Jegadeesh & Titman (1993) momentum strategy with aggressive parameters and constant position sizing.
 
 ## Strategy Specification
 
-**Formation Period**: 12 months  
-**Holding Period**: 6 months  
-**Portfolio Construction**: Top and bottom 20% quintiles  
+**Formation Period**: 6 months  
+**Holding Period**: 3 months  
+**Portfolio Construction**: Top and bottom 10% (decile portfolios)  
 **Rebalancing**: Monthly  
 **Position Sizing**: Fixed at 1.0x (no volatility adjustment)  
 
@@ -47,9 +47,15 @@ The script will:
 ## Performance Characteristics
 
 Expected characteristics of this version:
+- **2024 Performance**: -0.2% (failed during French political crisis)
+- **Sharpe Ratio**: -0.23 (negative = poor risk-adjusted returns)
+- **Max Drawdown**: -0.96%
 - Works well in stable, low-volatility markets
 - Vulnerable to regime shifts and volatility spikes
-- Higher maximum drawdown than regime-aware version
-- Lower risk-adjusted returns during turbulent periods
+- Cannot be leveraged due to negative Sharpe ratio
+
+## What This Version Teaches
+
+This implementation demonstrates why **constant volatility assumptions are dangerous**. Academic strategies often assume stable conditions, but real markets experience regime changes.
 
 The failure of V1 during 2024 motivated the development of V2 with dynamic position sizing.

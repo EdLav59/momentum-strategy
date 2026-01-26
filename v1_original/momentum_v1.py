@@ -80,8 +80,8 @@ class MomentumStrategyV1:
             'STMPA.PA',   # STMicroelectronics
             'TEP.PA',     # Teleperformance
             'HO.PA',      # Thales
-            'FP.PA',      # TotalEnergies
-            'URW.AS',     # Unibail-Rodamco-Westfield
+            'TTE.PA',      # TotalEnergies
+            'URW.PA',     # Unibail-Rodamco-Westfield
             'VIE.PA',     # Veolia
             'DG.PA',      # Vinci
             'VIV.PA',     # Vivendi
@@ -94,10 +94,10 @@ class MomentumStrategyV1:
             'BMW.DE',     # BMW
             'CON.DE',     # Continental
             'DAI.DE',     # Daimler (Mercedes-Benz)
-            '1COV.DE',    # Covestro
+            '1COV.VI',    # Covestro
             'DB1.DE',     # Deutsche Boerse
             'DBK.DE',     # Deutsche Bank
-            'DPW.DE',     # Deutsche Post
+            'DHL.DE',     # Deutsche Post
             'DTE.DE',     # Deutsche Telekom
             'EOAN.DE',    # E.ON
             'FRE.DE',     # Fresenius
@@ -116,10 +116,10 @@ class MomentumStrategyV1:
         ]
         
         # Strategy parameters
-        self.formation_months = 12
-        self.holding_months = 6
-        self.top_percentile = 20
-        self.bottom_percentile = 20
+        self.formation_months = 6
+        self.holding_months = 3
+        self.top_percentile = 10
+        self.bottom_percentile = 10
         
         # Data storage
         self.price_data = None
@@ -137,28 +137,37 @@ class MomentumStrategyV1:
         print("=" * 70)
     
     def fetch_data(self):
-        """Download historical price data"""
+        """Download historical price data from Yahoo Finance"""
         print("\n[1/6] Fetching historical data...")
+        print("  Downloading stocks one by one (this takes 10-15 minutes)...")
         
-        raw_data = yf.download(
-            self.tickers,
-            start=self.start_date,
-            end=self.end_date,
-            progress=False
-        )
+        all_data = {}
+        success_count = 0
         
-        # Handle MultiIndex
-        if isinstance(raw_data.columns, pd.MultiIndex):
-            if 'Adj Close' in raw_data.columns.get_level_values(0):
-                self.price_data = raw_data['Adj Close']
-            else:
-                self.price_data = raw_data['Close']
-        else:
-            self.price_data = raw_data['Adj Close'] if 'Adj Close' in raw_data.columns else raw_data['Close']
+        for ticker in self.tickers:
+            try:
+                # Create ticker object
+                stock = yf.Ticker(ticker)
+                
+                # Get historical data using history() method instead of download()
+                hist = stock.history(start=self.start_date, end=self.end_date, auto_adjust=True)
+                
+                if not hist.empty and len(hist) > 100:  # At least 100 days of data
+                    all_data[ticker] = hist['Close']
+                    success_count += 1
+                    if success_count % 10 == 0:
+                        print(f"  Downloaded {success_count}/{len(self.tickers)} stocks...")
+            except Exception as e:
+                continue
+        
+        if len(all_data) == 0:
+            raise RuntimeError("No price data available")
+        
+        self.price_data = pd.DataFrame(all_data)
         
         # Clean data
         initial_stocks = self.price_data.shape[1]
-        self.price_data = self.price_data.dropna(thresh=len(self.price_data)*0.8, axis=1)
+        self.price_data = self.price_data.dropna(thresh=len(self.price_data)*0.7, axis=1)
         removed = initial_stocks - self.price_data.shape[1]
         
         if removed > 0:
@@ -330,7 +339,7 @@ class MomentumStrategyV1:
         ax1.axhline(y=1, color='black', linestyle='--', alpha=0.3)
         
         # Highlight 2024 period
-        mask_2024 = dates.year == 2024
+        mask_2024 = dates.dt.year == 2024
         if mask_2024.any():
             ax1.axvspan(dates[mask_2024].min(), dates[mask_2024].max(), 
                        alpha=0.2, color='red', label='2024 Volatility Period')
@@ -374,7 +383,7 @@ class MomentumStrategyV1:
         
         # 5. Annual Returns
         ax5 = plt.subplot(2, 3, 5)
-        self.results_df['year'] = dates.year
+        self.results_df['year'] = dates.dt.year
         annual_returns = self.results_df.groupby('year')['momentum_return'].apply(
             lambda x: (1 + x).prod() - 1
         )
@@ -412,7 +421,7 @@ class MomentumStrategyV1:
         plt.tight_layout()
         
         # Save
-        output_dir = 'v1_original/results_v1'
+        output_dir = 'results_v1'
         os.makedirs(output_dir, exist_ok=True)
         plt.savefig(f'{output_dir}/performance_v1.png', dpi=300, bbox_inches='tight')
         print(f"Chart saved to {output_dir}/performance_v1.png")
@@ -423,7 +432,7 @@ class MomentumStrategyV1:
         """Save results to CSV"""
         print("\n[5/6] Saving results...")
         
-        output_dir = 'v1_original/results_v1'
+        output_dir = 'results_v1'
         os.makedirs(output_dir, exist_ok=True)
         
         # Save trades

@@ -82,6 +82,7 @@ Requires Python 3.9 or 3.10.
 cd v1_original
 python momentum_v1.py
 ```
+
 This runs the original strategy and saves results to `results_v1/`.
 
 ### Run Version 2 (Regime-Aware)
@@ -90,6 +91,7 @@ This runs the original strategy and saves results to `results_v1/`.
 cd v2_regime_aware
 python momentum_v2.py
 ```
+
 This runs the improved strategy with regime detection and saves results to `results_v2/`.
 
 ### Analyze the Differences
@@ -97,8 +99,8 @@ This runs the improved strategy with regime detection and saves results to `resu
 ```bash
 jupyter notebook analysis/failure_analysis_2024.ipynb
 ```
-This notebook compares both versions and analyzes the 2024 failure in detail.
 
+This notebook compares both versions and analyzes the 2024 failure in detail.
 
 ## Technical Details
 
@@ -116,6 +118,7 @@ Jegadeesh, N., & Titman, S. (1993). Returns to buying winners and selling losers
 ## Author
 
 Edouard Lavalard  
+
 ## License
 
 MIT License

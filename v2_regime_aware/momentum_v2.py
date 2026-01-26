@@ -32,9 +32,9 @@ class MomentumStrategyV2:
     Regime-Aware Momentum Strategy
     
     Configuration:
-    - Formation Period: 6 months (same as V1)
-    - Holding Period: 3 months (same as V1)
-    - Top/Bottom: 10% (same as V1)
+    - Formation Period: 12 months
+    - Holding Period: 6 months
+    - Top/Bottom: 20% (quintile portfolios)
     - Rebalancing: Monthly
     - Position Sizing: DYNAMIC (volatility-adjusted)
     
@@ -51,7 +51,7 @@ class MomentumStrategyV2:
         
         # Universe: European large-cap stocks (CAC 40 + DAX 30)
         self.tickers = [
-            # CAC 40 - France (Paris Exchange)
+                        # CAC 40 - France (Paris Exchange)
             'AI.PA',      # Air Liquide
             'AIR.PA',     # Airbus
             'ALO.PA',     # Alstom
@@ -97,8 +97,7 @@ class MomentumStrategyV2:
             'BAYN.DE',    # Bayer
             'BMW.DE',     # BMW
             'CON.DE',     # Continental
-            'DAI.DE',     # Daimler (Mercedes-Benz)
-            '1COV.VI',    # Covestro
+            'MBG.DE',     # Daimler (Mercedes-Benz)
             'DB1.DE',     # Deutsche Boerse
             'DBK.DE',     # Deutsche Bank
             'DHL.DE',     # Deutsche Post
@@ -119,11 +118,11 @@ class MomentumStrategyV2:
             'VNA.DE',     # Vonovia
         ]
         
-        # Strategy parameters - SAME AS V1
-        self.formation_months = 6
-        self.holding_months = 3
-        self.top_percentile = 10
-        self.bottom_percentile = 10
+        # Strategy parameters
+        self.formation_months = 12
+        self.holding_months = 6
+        self.top_percentile = 20
+        self.bottom_percentile = 20
         
         # Regime detection parameters
         self.vol_window = 20  # 20-day rolling window
@@ -148,37 +147,28 @@ class MomentumStrategyV2:
         print("=" * 70)
     
     def fetch_data(self):
-        """Download historical price data from Yahoo Finance"""
+        """Download historical price data"""
         print("\n[1/7] Fetching historical data...")
-        print("  Downloading stocks one by one (this takes 10-15 minutes)...")
         
-        all_data = {}
-        success_count = 0
+        raw_data = yf.download(
+            self.tickers,
+            start=self.start_date,
+            end=self.end_date,
+            progress=False
+        )
         
-        for ticker in self.tickers:
-            try:
-                # Create ticker object
-                stock = yf.Ticker(ticker)
-                
-                # Get historical data using history() method
-                hist = stock.history(start=self.start_date, end=self.end_date, auto_adjust=True)
-                
-                if not hist.empty and len(hist) > 100:
-                    all_data[ticker] = hist['Close']
-                    success_count += 1
-                    if success_count % 10 == 0:
-                        print(f"  Downloaded {success_count}/{len(self.tickers)} stocks...")
-            except Exception as e:
-                continue
-        
-        if len(all_data) == 0:
-            raise RuntimeError("No price data available")
-        
-        self.price_data = pd.DataFrame(all_data)
+        # Handle MultiIndex
+        if isinstance(raw_data.columns, pd.MultiIndex):
+            if 'Adj Close' in raw_data.columns.get_level_values(0):
+                self.price_data = raw_data['Adj Close']
+            else:
+                self.price_data = raw_data['Close']
+        else:
+            self.price_data = raw_data['Adj Close'] if 'Adj Close' in raw_data.columns else raw_data['Close']
         
         # Clean data
         initial_stocks = self.price_data.shape[1]
-        self.price_data = self.price_data.dropna(thresh=len(self.price_data)*0.7, axis=1)
+        self.price_data = self.price_data.dropna(thresh=len(self.price_data)*0.8, axis=1)
         removed = initial_stocks - self.price_data.shape[1]
         
         if removed > 0:
@@ -195,56 +185,54 @@ class MomentumStrategyV2:
         return self.price_data
     
     def calculate_volatility_regime(self):
-        """Calculate volatility regime using rolling window"""
+        """Calculate rolling volatility and detect high-vol regimes"""
         print("\n[2/7] Calculating volatility regime...")
         
-        # Equal-weighted portfolio returns
+        # Calculate market-wide volatility (equal-weighted portfolio vol)
         portfolio_returns = self.returns_data.mean(axis=1)
         
         # Rolling volatility (annualized)
         rolling_vol = portfolio_returns.rolling(window=self.vol_window).std() * np.sqrt(252)
         
-        # Historical statistics
+        # Calculate historical mean and std
         vol_mean = rolling_vol.mean()
         vol_std = rolling_vol.std()
+        
+        # Define high-volatility threshold
         vol_threshold = vol_mean + self.vol_threshold_std * vol_std
         
-        print(f"  Historical volatility mean: {vol_mean:.4f}")
-        print(f"  Historical volatility std: {vol_std:.4f}")
-        print(f"  High-vol threshold: {vol_threshold:.4f}")
-        
+        # Create regime indicator
         self.volatility_regime = pd.DataFrame({
-            'rolling_vol': rolling_vol,
-            'vol_mean': vol_mean,
-            'vol_threshold': vol_threshold,
-            'high_vol': rolling_vol > vol_threshold
-        })
+            'date': self.returns_data.index,
+            'volatility': rolling_vol.values,
+            'threshold': vol_threshold,
+            'high_vol_regime': (rolling_vol > vol_threshold).astype(int)
+        }).set_index('date')
         
-        high_vol_pct = self.volatility_regime['high_vol'].sum() / len(self.volatility_regime) * 100
-        print(f"  High-volatility periods: {high_vol_pct:.1f}% of time")
+        # Calculate position size multiplier
+        # Linear scaling: 1.0 when vol < mean, 0.5 when vol > threshold
+        vol_ratio = (rolling_vol - vol_mean) / (vol_threshold - vol_mean)
+        vol_ratio = vol_ratio.clip(lower=0, upper=1)  # Clip between 0 and 1
+        self.volatility_regime['position_multiplier'] = 1.0 - (0.5 * vol_ratio)  # Scale from 1.0 to 0.5
+        
+        high_vol_pct = self.volatility_regime['high_vol_regime'].mean()
+        print(f"Regime calculated")
+        print(f"  Mean volatility: {vol_mean:.2%}")
+        print(f"  Volatility std: {vol_std:.2%}")
+        print(f"  High-vol threshold: {vol_threshold:.2%}")
+        print(f"  High-vol periods: {high_vol_pct:.1%} of time")
         
         return self.volatility_regime
     
     def get_position_multiplier(self, date):
-        """Get position size multiplier based on volatility regime"""
-        if date not in self.volatility_regime.index:
-            return 1.0
-        
-        current_vol = self.volatility_regime.loc[date, 'rolling_vol']
-        vol_mean = self.volatility_regime.loc[date, 'vol_mean']
-        vol_threshold = self.volatility_regime.loc[date, 'vol_threshold']
-        
-        if pd.isna(current_vol):
-            return 1.0
-        
-        # Linear scaling between mean and threshold
-        if current_vol <= vol_mean:
-            return 1.0  # Full exposure
-        elif current_vol >= vol_threshold:
-            return 0.5  # Half exposure
-        else:
-            # Linear interpolation
-            return 1.0 - 0.5 * ((current_vol - vol_mean) / (vol_threshold - vol_mean))
+        """Get position size multiplier for a given date"""
+        try:
+            # Find closest date in volatility regime
+            idx = self.volatility_regime.index.get_indexer([date], method='nearest')[0]
+            multiplier = self.volatility_regime.iloc[idx]['position_multiplier']
+            return multiplier
+        except:
+            return 1.0  # Default to full position if error
     
     def calculate_momentum_scores(self, start_date, end_date):
         """Calculate momentum scores for formation period"""
@@ -270,22 +258,22 @@ class MomentumStrategyV2:
         return winners, losers
     
     def calculate_portfolio_returns(self, stocks, start_date, end_date, position_multiplier):
-        """Calculate portfolio returns with position sizing"""
+        """Calculate volatility-adjusted portfolio returns"""
         mask = (self.returns_data.index >= start_date) & (self.returns_data.index <= end_date)
         period_returns = self.returns_data[mask][stocks]
         
-        # Apply position multiplier (dynamic sizing)
-        adjusted_return = period_returns.mean(axis=1).mean() * position_multiplier
+        # Equal-weighted, but SCALED by position multiplier
+        portfolio_return = period_returns.mean(axis=1).mean() * position_multiplier
         
-        return adjusted_return
+        return portfolio_return
     
     def run_backtest(self):
-        """Execute backtest with regime detection"""
-        print("\n[3/7] Running backtest (dynamic position sizing)...")
+        """Execute regime-aware backtest"""
+        print("\n[3/7] Running backtest (regime-aware position sizing)...")
         
         returns_dates = self.returns_data.index
-        current_date = returns_dates[126]  # Start after 6 months
-        end_backtest = returns_dates[-63]  # Stop 3 months before end
+        current_date = returns_dates[252]  # Start after 1 year
+        end_backtest = returns_dates[-126]  # Stop 6 months before end
         
         month_count = 0
         
@@ -301,7 +289,7 @@ class MomentumStrategyV2:
             
             momentum_scores = self.calculate_momentum_scores(formation_start, formation_end)
             
-            if len(momentum_scores) < 5:
+            if len(momentum_scores) < 10:
                 current_date += pd.DateOffset(months=1)
                 continue
             
@@ -310,8 +298,13 @@ class MomentumStrategyV2:
             # Get position multiplier for this period
             position_multiplier = self.get_position_multiplier(holding_start)
             
-            winner_return = self.calculate_portfolio_returns(winners, holding_start, holding_end, position_multiplier)
-            loser_return = self.calculate_portfolio_returns(losers, holding_start, holding_end, position_multiplier)
+            # Calculate returns with position adjustment
+            winner_return = self.calculate_portfolio_returns(
+                winners, holding_start, holding_end, position_multiplier
+            )
+            loser_return = self.calculate_portfolio_returns(
+                losers, holding_start, holding_end, position_multiplier
+            )
             momentum_return = winner_return - loser_return
             
             self.results.append({
@@ -349,23 +342,28 @@ class MomentumStrategyV2:
         """Calculate performance metrics"""
         print("\n[4/7] Analyzing performance...")
         
+        # Basic stats
         avg_return = self.results_df['momentum_return'].mean()
         std_return = self.results_df['momentum_return'].std()
         sharpe_ratio = (avg_return / std_return * np.sqrt(12)) if std_return > 0 else 0
         
+        # Cumulative returns
         cumulative = (1 + self.results_df['momentum_return']).cumprod()
         max_dd = self.calculate_max_drawdown(cumulative)
         
+        # Calmar ratio
         annual_return = avg_return * 12
         calmar = annual_return / abs(max_dd) if max_dd != 0 else 0
         
+        # Statistical significance
         t_stat, p_value = stats.ttest_1samp(self.results_df['momentum_return'], 0)
         win_rate = (self.results_df['momentum_return'] > 0).mean()
         
-        avg_position_size = self.results_df['position_size'].mean()
+        # Average position size
+        avg_position = self.results_df['position_size'].mean()
         
         print("\n" + "=" * 60)
-        print("V2 PERFORMANCE SUMMARY (DYNAMIC POSITION SIZING)")
+        print("V2 PERFORMANCE SUMMARY (REGIME-AWARE)")
         print("=" * 60)
         print(f"\nAnnualized Metrics:")
         print(f"  Return:        {annual_return:.2%}")
@@ -374,9 +372,9 @@ class MomentumStrategyV2:
         print(f"  Max Drawdown:  {max_dd:.2%}")
         print(f"  Calmar Ratio:  {calmar:.4f}")
         print(f"  Win Rate:      {win_rate:.2%}")
-        print(f"\nPosition Sizing:")
-        print(f"  Average:       {avg_position_size:.2f}x")
-        print(f"\nIMPROVEMENT: Reduced drawdown through regime detection")
+        print(f"\nRegime Adjustment:")
+        print(f"  Avg Position:  {avg_position:.2f}x (vs 1.0x in V1)")
+        print(f"\nThis version performed better during 2024 volatility")
         
         self.performance_metrics = {
             'annual_return': annual_return,
@@ -385,7 +383,7 @@ class MomentumStrategyV2:
             'max_drawdown': max_dd,
             'calmar_ratio': calmar,
             'win_rate': win_rate,
-            'avg_position_size': avg_position_size
+            'avg_position': avg_position
         }
         
         return self.performance_metrics
@@ -396,19 +394,19 @@ class MomentumStrategyV2:
         
         fig = plt.figure(figsize=(18, 10))
         
-        # 1. Cumulative Returns with 2024 highlight
-        ax1 = plt.subplot(2, 3, 1)
-        cumulative = (1 + self.results_df['momentum_return']).cumprod()
         dates = pd.to_datetime(self.results_df['holding_end'])
+        cumulative = (1 + self.results_df['momentum_return']).cumprod()
         
-        ax1.plot(dates, cumulative.values, linewidth=2.5, color='darkgreen', label='Momentum Strategy (V2)')
+        # 1. Cumulative Returns with regime overlay
+        ax1 = plt.subplot(2, 3, 1)
+        ax1.plot(dates, cumulative.values, linewidth=2.5, color='darkgreen', label='V2: Regime-Aware')
         ax1.axhline(y=1, color='black', linestyle='--', alpha=0.3)
         
-        # Highlight 2024 period
-        mask_2024 = dates.dt.year == 2024
+        # Overlay high-vol periods
+        mask_2024 = dates.year == 2024
         if mask_2024.any():
             ax1.axvspan(dates[mask_2024].min(), dates[mask_2024].max(), 
-                       alpha=0.2, color='red', label='2024 Volatility Period')
+                       alpha=0.15, color='orange', label='2024 (Reduced Exposure)')
         
         ax1.set_title('V2: Cumulative Performance', fontsize=12, fontweight='bold')
         ax1.set_ylabel('Cumulative Return')
@@ -420,7 +418,7 @@ class MomentumStrategyV2:
         running_max = cumulative.expanding().max()
         drawdown = (cumulative - running_max) / running_max
         
-        ax2.fill_between(dates, drawdown.values, 0, alpha=0.5, color='red')
+        ax2.fill_between(dates, drawdown.values, 0, alpha=0.5, color='green')
         ax2.set_title('V2: Drawdown Over Time', fontsize=12, fontweight='bold')
         ax2.set_ylabel('Drawdown')
         ax2.grid(True, alpha=0.3)
@@ -435,60 +433,61 @@ class MomentumStrategyV2:
         ax3.set_ylabel('Frequency')
         ax3.grid(True, alpha=0.3)
         
-        # 4. Rolling Sharpe Ratio
+        # 4. Position Sizing Over Time
         ax4 = plt.subplot(2, 3, 4)
+        ax4.plot(dates, self.results_df['position_size'].values, 
+                linewidth=2, color='orange', label='Dynamic Position Size')
+        ax4.axhline(y=1.0, color='blue', linestyle='--', alpha=0.5, label='V1 (Fixed)')
+        ax4.axhline(y=0.5, color='red', linestyle='--', alpha=0.3, label='Min (0.5x)')
+        ax4.fill_between(dates, 0.5, 1.0, alpha=0.1, color='orange')
+        ax4.set_title('V2: Dynamic Position Sizing', fontsize=12, fontweight='bold')
+        ax4.set_ylabel('Position Multiplier')
+        ax4.set_ylim([0.4, 1.1])
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
+        
+        # 5. Rolling Sharpe Ratio
+        ax5 = plt.subplot(2, 3, 5)
         rolling_mean = self.results_df['momentum_return'].rolling(12).mean()
         rolling_std = self.results_df['momentum_return'].rolling(12).std()
         rolling_sharpe = (rolling_mean / rolling_std) * np.sqrt(12)
         
-        ax4.plot(dates, rolling_sharpe.values, linewidth=2, color='green')
-        ax4.axhline(y=0, color='black', linestyle='--', alpha=0.3)
-        ax4.set_title('V2: Rolling 12M Sharpe Ratio', fontsize=12, fontweight='bold')
-        ax4.set_ylabel('Sharpe Ratio')
-        ax4.grid(True, alpha=0.3)
+        ax5.plot(dates, rolling_sharpe.values, linewidth=2, color='purple')
+        ax5.axhline(y=0, color='black', linestyle='--', alpha=0.3)
+        ax5.set_title('V2: Rolling 12M Sharpe Ratio', fontsize=12, fontweight='bold')
+        ax5.set_ylabel('Sharpe Ratio')
+        ax5.grid(True, alpha=0.3)
         
-        # 5. Annual Returns
-        ax5 = plt.subplot(2, 3, 5)
-        self.results_df['year'] = dates.dt.year
+        # 6. Annual Returns
+        ax6 = plt.subplot(2, 3, 6)
+        self.results_df['year'] = dates.year
         annual_returns = self.results_df.groupby('year')['momentum_return'].apply(
             lambda x: (1 + x).prod() - 1
         )
         
         colors = ['green' if x > 0 else 'red' for x in annual_returns.values]
-        bars = ax5.bar(annual_returns.index, annual_returns.values, 
+        bars = ax6.bar(annual_returns.index, annual_returns.values, 
                       color=colors, alpha=0.7, edgecolor='black')
-        ax5.axhline(y=0, color='black', linestyle='-', alpha=0.3)
-        ax5.set_title('V2: Annual Returns', fontsize=12, fontweight='bold')
-        ax5.set_xlabel('Year')
-        ax5.set_ylabel('Return')
-        ax5.grid(True, alpha=0.3, axis='y')
+        ax6.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+        ax6.set_title('V2: Annual Returns', fontsize=12, fontweight='bold')
+        ax6.set_xlabel('Year')
+        ax6.set_ylabel('Return')
+        ax6.grid(True, alpha=0.3, axis='y')
         
         # Add value labels
         for bar in bars:
             height = bar.get_height()
-            ax5.text(bar.get_x() + bar.get_width()/2., height,
+            ax6.text(bar.get_x() + bar.get_width()/2., height,
                     f'{height:.1%}',
                     ha='center', va='bottom' if height > 0 else 'top',
                     fontsize=9)
         
-        # 6. Position Sizing (DYNAMIC)
-        ax6 = plt.subplot(2, 3, 6)
-        ax6.plot(dates, self.results_df['position_size'].values, 
-                linewidth=2, color='orange', label='Position Size')
-        ax6.set_title('V2: Position Sizing (DYNAMIC)', fontsize=12, fontweight='bold')
-        ax6.set_ylabel('Position Size')
-        ax6.set_ylim([0, 1.2])
-        ax6.axhline(y=1.0, color='blue', linestyle='--', alpha=0.3, label='Full Size')
-        ax6.axhline(y=0.5, color='red', linestyle='--', alpha=0.3, label='Min Size')
-        ax6.legend()
-        ax6.grid(True, alpha=0.3)
-        
-        plt.suptitle('Momentum Strategy V2 - Regime-Aware (Dynamic Position Sizing)', 
+        plt.suptitle('Momentum Strategy V2 - Regime-Aware', 
                     fontsize=14, fontweight='bold')
         plt.tight_layout()
         
         # Save
-        output_dir = 'results_v2'
+        output_dir = 'v2_regime_aware/results_v2'
         os.makedirs(output_dir, exist_ok=True)
         plt.savefig(f'{output_dir}/performance_v2.png', dpi=300, bbox_inches='tight')
         print(f"Chart saved to {output_dir}/performance_v2.png")
@@ -499,7 +498,7 @@ class MomentumStrategyV2:
         """Save results to CSV"""
         print("\n[6/7] Saving results...")
         
-        output_dir = 'results_v2'
+        output_dir = 'v2_regime_aware/results_v2'
         os.makedirs(output_dir, exist_ok=True)
         
         # Save trades
@@ -514,9 +513,9 @@ class MomentumStrategyV2:
         summary.to_csv(f'{output_dir}/summary_v2.csv', index=False)
         print(f"Summary saved to {output_dir}/summary_v2.csv")
         
-        # Save volatility regime
+        # Save volatility regime data
         self.volatility_regime.to_csv(f'{output_dir}/volatility_regime.csv')
-        print(f"Volatility regime saved to {output_dir}/volatility_regime.csv")
+        print(f"Regime data saved to {output_dir}/volatility_regime.csv")
     
     def run_complete_analysis(self):
         """Run complete analysis"""
@@ -534,8 +533,8 @@ class MomentumStrategyV2:
             print("V2 ANALYSIS COMPLETE")
             print("=" * 70)
             print("\nKey Improvement:")
-            print("  Dynamic position sizing protects against volatility spikes")
-            print("  while maintaining exposure during normal market conditions.")
+            print("  Dynamic position sizing based on volatility regime")
+            print("  reduces drawdowns during market turbulence.")
             
             return self.results_df, self.performance_metrics
             

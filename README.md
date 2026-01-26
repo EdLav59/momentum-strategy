@@ -99,40 +99,6 @@ jupyter notebook analysis/failure_analysis_2024.ipynb
 ```
 This notebook compares both versions and analyzes the 2024 failure in detail.
 
-## What I Learned
-
-### Technical Lessons
-
-1. **Market regimes matter**: Strategies must adapt to changing volatility environments
-2. **Position sizing is critical**: Fixed positions amplify losses during regime shifts
-3. **Risk management is essential**: Protecting capital matters more than maximizing returns
-4. **Simple beats complex**: A basic volatility threshold works better than complex models
-
-### Practical Lessons
-
-1. **Failure teaches more than success**: The 2024 drawdown revealed fundamental flaws
-2. **Assumptions must be tested**: "Constant volatility" sounds reasonable until it isn't
-3. **Academic theory needs adaptation**: Real markets don't always behave like backtests
-4. **Risk-adjusted returns matter**: Lower returns with controlled risk beats high returns with crashes
-
-### Implementation Lessons
-
-1. **Code for clarity**: Future-you will thank present-you for clear documentation
-2. **Version control decisions**: Keeping broken code shows learning journey
-3. **Real data matters**: Synthetic data would hide the 2024 failure
-4. **Visualizations convince**: Charts show problems faster than statistics
-
-## Limitations
-
-This analysis has important limitations:
-
-1. **Hindsight bias**: The regime threshold was calibrated after observing 2024
-2. **Parameter sensitivity**: Different vol windows or thresholds yield different results
-3. **Transaction costs ignored**: Real implementation has costs and slippage
-4. **Small sample size**: One regime shift doesn't prove the solution works generally
-5. **Survivorship bias**: Universe selection may affect results
-
-The goal is demonstrating learning from failure, not claiming a perfect solution.
 
 ## Technical Details
 

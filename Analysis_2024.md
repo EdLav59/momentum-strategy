@@ -291,6 +291,3 @@ V2 specific:
 ---
 
 **Author:** Edouard Lavalard  
-**Institution:** ESSEC Business School | AXA Investment Managers  
-**Date:** January 2026  
-**Repository:** [github.com/EdLav59/momentum-strategy](https://github.com/EdLav59/momentum-strategy)

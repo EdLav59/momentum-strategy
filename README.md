@@ -1,140 +1,144 @@
-# Momentum Trading Strategy: From Academic Theory to Market Reality
+# European Equity Momentum Strategy with Z-Score Filtering
 
-Implementation of Jegadeesh & Titman (1993) momentum strategy with lessons learned from 2024 market regime changes.
+A quantitative momentum trading strategy for European large-cap equities, implementing standardized Z-score signal filtering, transaction cost modeling, and comprehensive performance analytics.
 
-## Overview
+**Author:** Edouard Lavalard  
+**Period:** 2019-2024
 
-This repository documents the evolution of a momentum trading strategy, from initial implementation through crisis adaptation. The project demonstrates how academic theory meets market reality, particularly during volatility spikes.
+---
 
-## The Story
+## Project Overview
 
-Version 1 implements the classic Jegadeesh & Titman momentum approach with aggressive parameters:
-- 6-month formation period to capture recent trends
-- 3-month holding period for rapid rebalancing
-- Top/Bottom 10% (decile portfolios for concentrated exposure)
-- Monthly rebalancing
+This project implements a long-short momentum strategy on European equity markets (CAC 40 + DAX 30), based on the seminal research by Jegadeesh & Titman (1993). The strategy uses Z-score normalization to filter momentum signals and includes explicit transaction cost modeling for institutional realism.
 
-The strategy assumes **constant volatility** and uses fixed position sizing. This approach worked well 2021-2023 but proved vulnerable during 2024 regime shifts.
+### Key Features
 
-During mid-2024, the strategy encountered significant drawdowns when French political uncertainty caused volatility spikes. The constant position sizing assumption meant the strategy maintained full exposure during a period when risk had fundamentally changed.
+- **Z-Score Signal Filtering**: Standardized momentum scores filter noise and identify statistically significant trends
+- **Transaction Cost Modeling**: 1 basis points per trade, reflecting realistic institutional execution costs
+- **Portfolio Rebalancing Logic**: Monthly rebalancing with turnover tracking
+- **Professional Analytics**: Comprehensive performance metrics, visualizations, and risk analysis
 
-Key observations:
-- Market volatility increased 2+ standard deviations above historical mean
-- Fixed position sizing amplified losses during the regime shift
-- The strategy needed adaptation to survive changing market conditions
+---
 
-The crisis revealed a critical flaw: **ignoring volatility regimes**. Markets alternate between low-volatility and high-volatility regimes, and position sizing should reflect this reality.
+## Strategy Configuration
 
-Key insights:
-- Momentum strategies work differently in high vs. low volatility environments
-- Constant volatility assumptions are dangerous during regime shifts
-- Risk management requires dynamic position sizing
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| **Formation Period** | 6 months | Captures medium-term momentum in European markets |
+| **Holding Period** | 1 month | Optimized to capture momentum before reversal |
+| **Signal Filter** | Z-score > ±1.5 | Trades only statistically significant signals (top/bottom ~15%) |
+| **Portfolio Selection** | Top/Bottom 10% deciles | Concentrated positions maximize momentum premium |
+| **Position Sizing** | Equal-weighted, constant 1.0x | Assumes constant market volatility |
+| **Transaction Costs** | 1 bp per trade | Large-cap European bid-ask spread |
+| **Rebalancing Frequency** | Monthly | Balances momentum capture vs transaction costs |
 
-Version 2 adds regime detection:
-- 20-day rolling volatility window
-- Dynamic position sizing: reduce exposure when vol > mean + 2*std
-- Position scales from 1.0x (normal) to 0.5x (high volatility)
+---
 
-This approach protects capital during turbulent periods while maintaining exposure during normal markets.
+## Methodology
 
-## Results Comparison
+### Z-Score Momentum Signal
 
-**Key Finding:** V2 achieves superior **risk-adjusted returns** despite similar absolute returns.
-
-| Metric | V1 (Original) | V2 (Regime-Aware) | Improvement |
-|--------|---------------|-------------------|-------------|
-| **Sharpe Ratio** | **-0.23** | **+0.35** | **+252%**  |
-| Annual Return | +0.16% | +0.12% | -4 bps |
-| Max Drawdown | -0.96% | -1.04% | Similar |
-| 2024 Return | **-0.2%** | **+1.0%** | **+120 bps** |
-| Win Rate | 60% | 62% | +2% |
-| Position Sizing | Fixed at 1.0x | Dynamic (0.5x-1.0x) | Adaptive |
-
-### Why Sharpe Ratio Matters
-
-The **252% improvement in Sharpe ratio** is the key metric:
-- V1's negative Sharpe (-0.23) means it loses money on a risk-adjusted basis
-- V2's positive Sharpe (+0.35) makes it institutionally viable and leverageable
-- In quantitative finance, Sharpe ratio determines strategy deployment, not absolute returns
-- A positive Sharpe can be scaled with leverage; a negative Sharpe cannot be fixed
-
-## Repository Structure
+For each stock in the universe during the formation period:
 
 ```
-momentum-trading-strategy/
-├── README.md
-├── requirements.txt
-├── v1_original/
-│   ├── README.md
-│   ├── momentum_v1.py
-│   └── results_v1/
-├── v2_regime_aware/
-│   ├── README.md
-│   ├── momentum_v2.py
-│   └── results_v2/
-└── analysis/
-    └── failure_analysis_2024.ipynb
+Momentum Score = Cumulative Return over 6 months
+Z-Score = (Momentum Score - Mean) / Std Dev
 ```
 
-## How to Run
+**Signal Filtering:**
+- **Winners:** Z-score > +1.5 (long position)
+- **Losers:** Z-score < -1.5 (short position)
+- **Neutral:** |Z-score| < 1.5 (no position, filtered out)
 
-### Setup
+This approach reduces noise by trading only momentum signals that are statistically significant (>1.5 standard deviations from mean).
 
-```bash
-git clone https://github.com/EdLav59/momentum-trading-strategy.git
-cd momentum-trading-strategy
-pip install -r requirements.txt
+### Portfolio Construction
+
+- Select top 10% of filtered winners for long portfolio
+- Select bottom 10% of filtered losers for short portfolio
+- Equal-weight within each portfolio
+- Rebalance monthly with transaction cost application
+
+### Transaction Cost Modeling
+
+```python
+Turnover = (New Positions ⊕ Old Positions) / Total Positions
+Transaction Cost = Turnover × 1 bp
+Net Return = Gross Return - Transaction Cost
 ```
 
-Requires Python 3.9 or 3.10.
+Average turnover: approximately 100% monthly (complete portfolio refresh)
 
-### Run Version 1 (Original)
+With 1 bp transaction costs (realistic for large-cap European equities), total costs represent approximately 0.6% annually.
 
-```bash
-cd v1_original
-python momentum_v1.py
-```
+---
 
-This runs the original strategy and saves results to `results_v1/`.
+## Results Summary
 
-### Run Version 2 (Regime-Aware)
+### Performance Metrics (2019-2024)
 
-```bash
-cd v2_regime_aware
-python momentum_v2.py
-```
+| Metric | Value |
+|--------|-------|
+| **Annual Return (Net)** | 1.23% |
+| **Annual Return (Gross)** | 1.35% |
+| **Sharpe Ratio** | 0.61 |
+| **Max Drawdown** | -2.34% |
+| **Calmar Ratio** | 0.53 |
+| **Win Rate** | 54.1% |
+| **Annual Volatility** | 2.03% |
+| **Avg Winner Z-Score** | +2.78 |
+| **Avg Loser Z-Score** | -2.42 |
+| **Z-Score Spread** | 5.19 |
 
-This runs the improved strategy with regime detection and saves results to `results_v2/`.
+### Cost Analysis
 
-### Analyze the Differences
+| Metric | Value |
+|--------|-------|
+| **Transaction Costs (Annual)** | 0.62% |
+| **Average Turnover** | 101.6% monthly |
+| **Cost per Rebalancing** | 0.010% |
 
-```bash
-jupyter notebook analysis/failure_analysis_2024.ipynb
-```
+### Annual Performance
 
-This notebook compares both versions and analyzes the 2024 failure in detail.
+| Year | Net Return | Gross Return | Note |
+|------|-----------|--------------|------|
+| 2019 | +0.3% | +0.4% | Initial period |
+| 2020 | +4.5% | +4.6% | Strong momentum capture during volatility |
+| 2021 | +0.7% | +0.8% | Consolidation period |
+| 2022 | +0.0% | +0.1% | Challenging market conditions |
+| 2023 | +2.9% | +3.0% | Recovery and positive momentum |
+| 2024 | **-1.7%** | **-1.6%** | **Failed during French elections** |
+| **Cumulative** | **+6.7%** | **+7.3%** | Over 5-year period |
 
-## Technical Details
+---
 
-**Data Source**: Yahoo Finance  
-**Universe**: 63 large-cap European stocks (CAC 40 + DAX 30)  
-**Period**: January 2019 - December 2024 (5 years)  
-**Formation Period**: 6 months  
-**Holding Period**: 3 months  
-**Portfolio Selection**: Top/Bottom 10% (decile portfolios)  
-**Rebalancing**: Monthly  
-**Position Sizing (V1)**: Fixed at 1.0x  
-**Position Sizing (V2)**: Dynamic 0.5x-1.0x based on 20-day rolling volatility  
-**Regime Threshold**: Mean + 2×std of rolling volatility  
+### What Went Wrong in 2024
 
-## References
+Despite achieving a positive Sharpe ratio (0.61) and 54% win rate over the full period, the strategy suffered a -1.7% loss in 2024 during the June-July French elections. The strategy assumed constant market volatility by using equal position sizing (1.0x) throughout all periods. This assumption proved incorrect when:
 
-Jegadeesh, N., & Titman, S. (1993). Returns to buying winners and selling losers: Implications for stock market efficiency. *The Journal of Finance*, 48(1), 65-91.
+1. **Volatility spiked unexpectedly** during political uncertainty
+2. **Momentum signals reversed rapidly** as markets reassessed risk
+3. **Full exposure amplified losses** with no defensive adjustment mechanism
 
-## Author
+The monthly rebalancing frequency (optimized for momentum capture) meant the strategy maintained full exposure during the entire volatility spike, unable to adapt mid-month.
 
-Edouard Lavalard  
+#
+## Academic Foundation
+
+This implementation builds on:
+
+- **Jegadeesh & Titman (1993)**: "Returns to Buying Winners and Selling Losers"
+- **Carhart (1997)**: Four-factor model including momentum
+- **Asness et al. (2013)**: "Value and Momentum Everywhere"
+
+The Z-score normalization approach follows standard practice in quantitative finance for cross-sectional signal filtering.
+
+## Contact
+
+**Edouard Lavalard**  
+
+---
 
 ## License
 
-MIT License
+MIT License - See LICENSE file for details

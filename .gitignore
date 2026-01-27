@@ -4,31 +4,45 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
-.venv
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Keep results directories but ignore their contents (except .gitkeep)
-v1_original/results_v1/*
-!v1_original/results_v1/.gitkeep
-v2_regime_aware/results_v2/*
-!v2_regime_aware/results_v2/.gitkeep
+# Data files (optional - uncomment if you don't want to commit results)
+# results/*.csv
+# results/*.png
 
-# Cached data
-data/*
-!data/.gitkeep
+# Logs
+*.log
